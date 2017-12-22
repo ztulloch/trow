@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Hamish Hutchings <moredhel@aoeu.me>"]
 
 [dependencies]
+ring = "0.11.0" # cookie depends on this version
 futures = "0.1"
 failure = { git = 'https://github.com/withoutboats/failure', rev = "ae276f58615174e5b2dbba8dd7c6e47a033c7e2c"}
 grpcio = "0.1.2"
@@ -19,3 +20,4 @@ uuid = { version = "0.5.1", features = ["v4", "rustc-serialize"] }
 
 # Private
 lycaon-protobuf = { path = "../protobuf" }
+lycaon-errors = { path = "../errors" }

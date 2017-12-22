@@ -15,7 +15,6 @@ pub enum Admin {
     Uuids(Vec<String>),
 }
 
-
 impl Admin {
     pub fn get_uuids(handler: State<config::BackendHandler>) -> Result<Admin, Error> {
         let backend = handler.backend();
@@ -23,7 +22,11 @@ impl Admin {
 
         use std::iter::FromIterator;
 
-        let uuids = response.get_uuids().iter().map(|wrapper| wrapper.get_uuid().to_owned()).collect::<Vec<String>>();
+        let uuids = response
+            .get_uuids()
+            .iter()
+            .map(|wrapper| wrapper.get_uuid().to_owned())
+            .collect::<Vec<String>>();
         debug!("Uuids: {:?}", uuids);
         Ok(Admin::Uuids(uuids))
     }

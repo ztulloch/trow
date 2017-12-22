@@ -39,6 +39,13 @@ message GenUuidResult {
   string uuid = 1;
 }
 
+// This message contains both the expected Uuid and digest of an
+// uploaded layer.
+message CommitLayer {
+  string uuid = 1;
+  string digest = 2;
+}
+
 // A list of Uuids
 // :Admin:
 message UuidList {
@@ -59,6 +66,8 @@ service Backend {
   // Cancel a pending upload
   // The digest field is used for the uuid in this rpc call
   rpc cancelUpload (Layer) returns (Result) {}
+
+  rpc commitUpload (CommitLayer) returns (Result) {}
 
 
   // ------------ Admin calls --------------------

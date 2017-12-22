@@ -15,3 +15,10 @@ impl Layer {
         self.digest.clone()
     }
 }
+
+#[derive_FromForm]
+#[derive(Debug)]
+pub struct DigestStruct {
+    pub query: bool,
+    pub digest: String,
+}

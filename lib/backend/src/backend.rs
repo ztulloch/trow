@@ -6,11 +6,10 @@ use grpcio;
 use grpc;
 
 use failure::Error;
-use std::error::Error as ErrorTrait;
 use futures::Future;
 use uuid::Uuid;
 
-use util;
+use errors;
 
 /// Struct implementing callbacks for the Frontend
 ///
@@ -174,6 +173,47 @@ impl grpc::backend_grpc::Backend for BackendService {
         );
         ctx.spawn(f);
     }
+
+    fn commit_upload(
+        &self,
+        ctx: grpcio::RpcContext,
+        req: grpc::backend::CommitLayer,
+        sink: grpcio::UnarySink<grpc::backend::Result>,
+    ) {
+        do_thing(req);
+        let mut resp = grpc::backend::Result::new();
+        let f = sink.success(resp).map_err(
+            move |e| warn!("failed to reply! {:?}", e),
+        );
+        ctx.spawn(f);
+    }
+}
+
+fn do_thing(req: grpc::backend::CommitLayer) -> Result<(), Error> {
+    use std::fs;
+    use ring::digest;
+    use std::io::Read;
+
+    let uuid = req.get_uuid();
+    let digest = req.get_digest();
+    let uuid_path = format!("data/scratch/{}", uuid);
+    let digest_path = format!("data/layers/{}", digest);
+    let mut vec_file = &mut Vec::new();
+
+    let mut file = fs::File::open(&uuid_path)?;
+    file.read_to_end(&mut vec_file);
+    let sha = digest::digest(&digest::SHA256, &vec_file);
+
+    let sha_ref: &[u8] = sha.as_ref();
+    let digest_ref: &[u8] = digest.as_ref();
+
+    if sha_ref == digest_ref {
+        warn!("Digests do not match!");
+        // let x: Result<(), Error> = Err(()).map_err(|e| Error::from(errors::Server::TestError(e)));
+    }
+
+    fs::rename(uuid_path, digest_path)?;
+    Ok(())
 }
 
 fn gen_uuid() -> Uuid {

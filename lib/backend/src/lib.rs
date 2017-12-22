@@ -3,8 +3,11 @@ extern crate futures;
 extern crate failure;
 extern crate uuid;
 extern crate protobuf;
+extern crate ring;
 
 extern crate lycaon_protobuf as grpc;
+extern crate lycaon_errors as errors;
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use(log, warn, info, debug)]
