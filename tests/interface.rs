@@ -227,8 +227,8 @@ mod interface_tests {
         get_non_existent_blob(&client);
         println!("Running unsupported()");
         unsupported(&client);
-        println!("Running upload_layer(image/test/notwork)");
-        upload_layer(&client, "image/test/notwork");
+        println!("Running upload_layer(repo/image/test)");
+        upload_layer(&client, "repo/image/test");
         println!("Running upload_layer(image/test)");
         upload_layer(&client, "image/test");
         println!("Running upload_layer(onename)");
