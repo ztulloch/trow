@@ -1,7 +1,10 @@
 ## Building
 
 ***These instructions will help build trow on Ubuntu.***
-
+- Install Rust Nightly
+```
+curl -s https://static.rust-lang.org/rustup.sh | sh -s -- --channel=nightly
+```
 - Firstly clone the trow repo.
 ```
 git clone git://github.com/ContainerSolutions/trow
