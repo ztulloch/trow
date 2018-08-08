@@ -8,3 +8,8 @@
 **/*.rs.bk
 
 data/
+# added by Zander
+certs/
+install/self-cert/ca.crt
+install/self-cert/domain.key
+protoc/

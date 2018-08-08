@@ -3,11 +3,9 @@ use std::io::Write;
 use std::path::Path;
 use std::str;
 
-use failure;
-use types::create_upload_info;
+use client_interface::ClientInterface;
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use grpc;
 use manifest::{self, FromJson, Manifest};
 use response::accepted_upload::AcceptedUpload;
 use response::empty::Empty;
@@ -19,9 +17,7 @@ use rocket::request::{self, FromRequest, Request};
 use rocket::response::NamedFile;
 use rocket::{self, Outcome};
 use serde_json;
-use state;
-use types::Layer;
-use client_interface::ClientInterface;
+use types::create_upload_info;
 
 static DATA_DIR: &'static str = "data";
 static MANIFESTS_DIR: &'static str = "manifests";
@@ -301,22 +297,6 @@ fn put_blob_qualified_3level(
     put_blob(config, format!("{}/{}/{}", org, repo, name), uuid, query)
 }
 
-//TODO: Move this shite.
-fn uuid_exists(handler: rocket::State<ClientInterface>, layer: &Layer) -> Result<bool, failure::Error> {
-    let backend = handler.backend();
-    let mut req = grpc::backend::Layer::new();
-    req.set_repo_name(layer.repo_name.to_owned());
-    req.set_digest(layer.digest.to_owned());
-
-    let response = backend.uuid_exists(&req)?;
-    debug!("UuidExists: {:?}", response.get_success());
-    if response.get_success() {
-        Ok(true)
-    } else {
-        Err(Error::DigestInvalid.into())
-    }
-}
-
 /*
 
 Uploads a blob or chunk of a blog.
@@ -326,39 +306,33 @@ Checks UUID. Returns UploadInfo with range set to correct position.
 */
 #[patch("/v2/<repo_name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob(
-    handler: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     repo_name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    //This needs to change to be a blob, no digest, or just go away
-    //There is no digest at the minute; that comes at put stage
-    let layer = Layer {
-        repo_name: repo_name.clone(),
-        digest: uuid.clone(),
-    };
-    //TODO change to is_valid_uuid()
-    //Should return path to write to or URL, client should *not*
-    //be in charge of this
-    if uuid_exists(handler, &layer).is_ok() {
-        let absolute_file = state::uuid::scratch_path(&uuid);
-        debug!("Streaming out to {}", absolute_file);
-        let len = chunk.stream_to_file(absolute_file);
+    let sink = ci.get_write_sink_for_upload(&repo_name, &uuid);
 
-        match len {
-            Ok(len) => Ok(create_upload_info(
-                uuid,
-                repo_name,
-                (0, len as u32),
-            )),
-            Err(_) => Err(Error::InternalError),
+    match sink {
+        Ok(mut sink) => {
+            //TODO: for the moment we'll just append, but this should seek to correct position
+            //according to spec shouldn't allow out-of-order uploads, so verify start address (from header)
+            //is same as current address
+            let len = chunk.stream_to(&mut sink);
+            match len {
+                //TODO: For chunked upload this should be start pos to end pos
+                Ok(len) => Ok(create_upload_info(uuid, repo_name, (0, len as u32))),
+                Err(_) => Err(Error::InternalError),
+            }
         }
-    } else {
-        // TODO: pipe breaks if we don't accept the whole file
-        // Currently makes us prone to DOS attack
-        warn!("Uuid {} does not exist, piping to /dev/null", uuid);
-        let _ = chunk.stream_to_file("/dev/null");
-        Err(Error::BlobUnknown)
+        Err(_) => {
+            // TODO: this conflates rpc errors with uuid not existing
+            // TODO: pipe breaks if we don't accept the whole file
+            // Possibly makes us prone to DOS attack?
+            warn!("Uuid {} does not exist, piping to /dev/null", uuid);
+            let _ = chunk.stream_to_file("/dev/null");
+            Err(Error::BlobUnknown)
+        }
     }
 }
 
@@ -367,13 +341,13 @@ fn patch_blob(
  */
 #[patch("/v2/<repo>/<name>/blobs/uploads/<uuid>", data = "<chunk>")]
 fn patch_blob_qualified(
-    handler: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
     uuid: String,
     chunk: rocket::data::Data,
 ) -> Result<UploadInfo, Error> {
-    patch_blob(handler, format!("{}/{}", repo, name), uuid, chunk)
+    patch_blob(ci, format!("{}/{}", repo, name), uuid, chunk)
 }
 
 /*
@@ -402,7 +376,7 @@ fn patch_blob_qualified_3level(
  */
 #[post("/v2/<repo_name>/blobs/uploads")]
 fn post_blob_upload_onename(
-    handler: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     repo_name: String,
 ) -> Result<UploadInfo, Error> {
     /*
@@ -415,22 +389,10 @@ fn post_blob_upload_onename(
     and tell the backend what the UUID is. This is a potential
     optimisation, but is arguably less flexible.
     */
-    let backend = handler.backend();
-    let mut req = grpc::backend::CreateUuidRequest::new();
-    req.set_repo_name(repo_name.clone());
-
-    let response = backend.create_uuid(&req).map_err(|e| {
-        //TODO should be stronger than a warn
+    ci.request_upload(&repo_name).map_err(|e| {
         warn!("Error getting ref from backend: {}", e);
         Error::InternalError
-    })?;
-    debug!("Client received: {:?}", response);
-
-    Ok(create_upload_info(
-        response.get_uuid().to_owned(),
-        repo_name,
-        (0, 0),
-    ))
+    })
 }
 
 /*
@@ -438,25 +400,26 @@ fn post_blob_upload_onename(
  */
 #[post("/v2/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload(
-    handler: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     repo: String,
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload {}/{}", repo, name);
-    post_blob_upload_onename(handler, format!("{}/{}", repo, name))
+    post_blob_upload_onename(ci, format!("{}/{}", repo, name))
 }
+
 /*
  * Parse 3 level <org>/<repo>/<name> style path and pass it to put_blob_upload_onename
  */
 #[post("/v2/<org>/<repo>/<name>/blobs/uploads")]
 fn post_blob_upload_3level(
-    handler: rocket::State<ClientInterface>,
+    ci: rocket::State<ClientInterface>,
     org: String,
     repo: String,
     name: String,
 ) -> Result<UploadInfo, Error> {
     info!("upload 3 way {}/{}/{}", org, repo, name);
-    post_blob_upload_onename(handler, format!("{}/{}/{}", org, repo, name))
+    post_blob_upload_onename(ci, format!("{}/{}/{}", org, repo, name))
 }
 
 /*
