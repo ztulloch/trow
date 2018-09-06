@@ -64,11 +64,18 @@ Registry root.
 
 Returns 200.
 */
+/*
 #[get("/v2")]
 fn get_v2root() -> Empty {
+    println!("get v2 rooting");
     Empty
 }
-
+*/
+#[get("/v2")]
+fn get_v2root() -> Result<Empty, Error> {
+    println!("get v2 rooting");
+    Err(Error::Unauthorized)
+}
 #[get("/")]
 fn get_homepage<'a>() -> HTML<'a> {
     const ROOT_RESPONSE: &str = "<!DOCTYPE html><html><body>
