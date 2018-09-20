@@ -5,6 +5,7 @@ use response::empty::Empty;
 use response::errors::Error;
 use response::html::HTML;
 use response::upload_info::UploadInfo;
+//use response::authenticate::Authenticate;
 use rocket::request::{self, FromRequest, Request};
 use rocket::{self, Outcome};
 use types::*;
@@ -12,6 +13,9 @@ use types::*;
 pub fn routes() -> Vec<rocket::Route> {
     routes![
         get_v2root,
+        get_token,
+        get_v2auth,
+        get_auth,
         get_homepage,
         get_manifest,
         get_manifest_2level,
@@ -75,15 +79,35 @@ fn get_v2root() -> Empty {
     println!("get v2 rooting");
     Empty
 }
-*/
+ */
+
+#[get("/token")]
+fn get_token() -> Empty {
+    println!("get token");
+    Empty
+}
+
 #[get("/v2")]
-fn get_v2root() -> Result<Empty, Error> {
+fn get_v2root() -> Authenticate {
   /*  if is_authorized() {
         Empty
     } else { */
         println!("get v2 rooting");
-        Err(Error::Unauthorized)
+//        Err(Error::Unauthorized)
+        Authenticate
 //    }
+}
+
+#[get("/v2/auth")]
+fn get_v2auth() -> Empty {
+    println!("get v2 auth rooting");
+    Empty
+}
+
+#[get("/auth")]
+fn get_auth() -> Empty {
+    println!("get auth rooting");
+    Empty
 }
 
 #[get("/")]

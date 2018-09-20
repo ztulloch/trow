@@ -1,25 +1,27 @@
 use rocket::http::Status;
 use rocket::request::Request;
 use rocket::response::{Responder, Response};
+//pub use types::Authenticate;
 /*
 WWW-Authenticate: Basic
 
 WWW-Authenticate: Basic realm="Access to the staging site", charset="UTF-8"
 */
 #[derive(Debug, Serialize)]
-pub struct AuthenticateHeader;
+pub struct Authenticate;
 
-impl<'r> Responder<'r> for Empty {
+impl<'r> Responder<'r> for Authenticate {
     fn respond_to(self, _: &Request) -> Result<Response<'r>, Status> {
         Response::build()
             .status(Status::Unauthorized)
-            .header("WWW-Autheniticate")
-            .header("Basic")
+            .header("Www-Autheniticate")
+            .header("Bearer")
             .header("realm=trow.test")
             .ok()
     }
 }
 
+/*
 impl Responder<'static> for String {
     fn respond_to(self, _: &Request) -> Result<Response<'static>, Status> {
         Response::build()
@@ -28,6 +30,7 @@ impl Responder<'static> for String {
             .ok()
     }
 }
+*/
 
 #[cfg(test)]
 mod test {
